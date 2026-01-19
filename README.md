@@ -1,5 +1,8 @@
 # WebFluid
-The simulation can be found [here](https://laurencewilkes.github.io/WebFluid/).
+The simulation can be found [here](https://laurencewilkes.github.io/WebFluid/). 
+Currently, the simulation only shows puffs of smoke at random intervals coming from random edges. 
+The borders are all still in place so eventually the screen will become completely white.
+The underlying fluid can be interacted with using the mouse.
 
 This is a 2D semi-Lagrangian fluid simulation based on the document [Real-Time Fluid Dynamics for Games](https://graphics.cs.cmu.edu/nsp/course/15-464/Fall09/papers/StamFluidforGames.pdf) by Jos Stam.
 
