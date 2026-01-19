@@ -11,10 +11,10 @@ The simulation works as a fractional step method where Navier&ndash;Stokes is sp
 
 ### Diffusion
 The diffusion step is a finite difference version of solving the equation 
-$$
-\frac{\partial \boldsymbol{x}}{\partial t} = \nu \nabla^2 \boldsymbol{x}
-.
-$$
+```math
+    \frac{\partial \boldsymbol{x}}{\partial t} = \nu \nabla^2 \boldsymbol{x}
+    .
+```
 The time derivative is represented by
 ```js
 (x[i, j] - x0[i, j]) / dt
@@ -29,15 +29,15 @@ This produces a linear system which is solved with Gauss&ndash;Seidel.
 
 ### Advection
 The advection step solves the advection equation
-$$
-\frac{\partial x}{\partial t} + \boldsymbol{u} \cdot \nabla x = 0
-,
-$$
+```math
+    \frac{\partial x}{\partial t} + \boldsymbol{u} \cdot \nabla x = 0
+    ,
+```
 which in turn implies that 
-$$
-\frac{\mathrm{d}}{\mathrm{d} t} \tilde{x}(q(t), t) = 0
-,
-$$
+```math
+    \frac{\mathrm{d}}{\mathrm{d} t} \tilde{x}(q(t), t) = 0
+    ,
+```
 where $`\tilde{x}(q, t)`$ represents the quantity $`x(q)`$ at time $`t`$ and position $`q`$, and $`q(t)`$ represents the position of a "particle" at time $`t`$.
 Here, $`q(t)`$ satisfies $`\dot{q}(t) = \boldsymbol{u}(q(t), t)`$.
 In essence, we assume that the quantity represented by $`x`$ (either dye density or a component of the velocity in our case) is transported along the path of the velocity. 
@@ -45,33 +45,33 @@ This is once again implemented by backtracing: the initial location of a particl
 
 ### Projection
 Finally, the projection step done to the velocity field in-between and after the diffusion and advection enforces the incompressibility constraint:
-$$
-\nabla \cdot \boldsymbol{u} = 0
-.
-$$ 
+```math
+    \nabla \cdot \boldsymbol{u} = 0
+    .
+``` 
 
 This is done by producing a value of $`\boldsymbol{u}`$ which is divergence free.
 We decompose 
-$$
-\boldsymbol{u} = \boldsymbol{u}^* + \nabla p
-$$ 
+```math
+    \boldsymbol{u} = \boldsymbol{u}^* + \nabla p
+``` 
 where $`\boldsymbol{u}^* `$ is divergence free, and enforce
-$$
-\boldsymbol{0} 
-= \nabla \cdot \boldsymbol{u}^*
-= \nabla \cdot (\boldsymbol{u} - \nabla p) 
-= \nabla \cdot \boldsymbol{u} - \nabla^2 p
-.
-$$ 
+```math
+    \boldsymbol{0} 
+    = \nabla \cdot \boldsymbol{u}^*
+    = \nabla \cdot (\boldsymbol{u} - \nabla p) 
+    = \nabla \cdot \boldsymbol{u} - \nabla^2 p
+    .
+``` 
 The value of $`p`$ is selected to solve the Poisson equation 
-$$
-\nabla^2 p = \nabla \cdot \boldsymbol{u}
-$$ 
+```math
+    \nabla^2 p = \nabla \cdot \boldsymbol{u}
+``` 
 and the velocity field is corrected
-$$
-\boldsymbol{u}^* = \boldsymbol{u} - \nabla p
-.
-$$ 
+```math
+    \boldsymbol{u}^* = \boldsymbol{u} - \nabla p
+    .
+``` 
 
 In practice, the field $`\nabla \cdot \boldsymbol{u} `$ is approximated by
 ```js
