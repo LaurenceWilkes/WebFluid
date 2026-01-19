@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <style>
+    html, body {margin: 0; height: 100%; overflow: hidden; background: #000;}
+    canvas {display: block; width: 100vw; height: 100vh;}
+  </style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false });
+
+// Parameters
+const N = 96;
+const diff = 0.00001; // dye diffusion rate
+const visc = 0.0005; // viscosity
+const GSiter = 12;
+const inflow = 180.0;
+const densityFlow = 10.0;
+
+const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+const IX = (i, j) => i + (N + 2) * j;
+
+function setBound(b, x) {
+  for (let i = 1; i <= N; i++) {
+    x[IX( 0 ,  i )] = b == 1 ? -x[IX(1, i)] : x[IX(1, i)];
+    x[IX(N+1,  i )] = b == 1 ? -x[IX(N, i)] : x[IX(N, i)];
+    x[IX( i ,  0 )] = b == 2 ? -x[IX(i, 1)] : x[IX(i, 1)];
+//    x[IX( i ,  0 )] = x[IX(i, 1)];                            // remove top boundary
+    x[IX( i , N+1)] = b == 2 ? -x[IX(i, N)] : x[IX(i, N)];
+  }
+  x[IX( 0 ,  0 )] = 0.5 * (x[IX(1,  0 )] + x[IX( 0 , 1)]);
+  x[IX( 0 , N+1)] = 0.5 * (x[IX(1, N+1)] + x[IX( 0 , N)]);
+  x[IX(N+1,  0 )] = 0.5 * (x[IX(N,  0 )] + x[IX(N+1, 1)]);
+  x[IX(N+1, N+1)] = 0.5 * (x[IX(N, N+1)] + x[IX(N+1, N)]);
+}
+
+function diffuse(b, x, x0, diff, dt) {
+  const a = dt * diff * N * N;
+  for (let k = 0; k < GSiter; k++) { // Gauss--Seidel
+    for (let i = 1; i <= N; i++) {
+      for (let j = 1; j <= N; j++) {
+        const id = IX(i, j);
+        x[id] = (x0[id] + a * (
+          x[IX(i-1, j)] + x[IX(i+1, j)] +
+          x[IX(i, j-1)] + x[IX(i, j+1)]
+        )) / (1 + 4 * a);
+      }
+    }
+    setBound(b, x);
+  }
+}
+
+function advect(b, d, d0, u, v, dt) {
+  const dt0 = dt * N;
+  for (let i = 1; i <= N; i++) {
+    for (let j = 1; j <= N; j++) {
+      const id = IX(i, j);
+      let f = i - dt0 * u[id];
+      let g = j - dt0 * v[id];
+      f = clamp(f, 0.5, N + 0.5);
+      const i0 = Math.floor(f), i1 = i0 + 1;
+      g = clamp(g, 0.5, N + 0.5);
+      const j0 = Math.floor(g), j1 = j0 + 1;
+      const s1 = f - i0, s0 = 1 - s1;
+      const t1 = g - j0, t0 = 1 - t1;
+      d[id] = s0 * (t0 * d0[IX(i0, j0)] + t1 * d0[IX(i0, j1)])
+            + s1 * (t0 * d0[IX(i1, j0)] + t1 * d0[IX(i1, j1)]);
+    }
+  }
+  setBound(b, d);
+}
+
+function densityStep(dens, vel, diff, dt) {
+  [dens["d"], dens["d0"]] = [dens["d0"], dens["d"]];
+  diffuse(0, dens.d, dens.d0, diff, dt);
+  [dens["d"], dens["d0"]] = [dens["d0"], dens["d"]];
+  advect(0, dens.d, dens.d0, vel.u, vel.v, dt);
+}
+
+function project(u, v, p, div) {
+  const h = 1.0 / N;
+  for (let i = 1; i <= N; i++) {
+    for (let j = 1; j <= N; j++) {
+      div[IX(i, j)] = -0.5 * h * (
+        (u[IX(i+1, j)] - u[IX(i-1, j)]) +
+        (v[IX(i, j+1)] - v[IX(i, j-1)])
+      );
+      p[IX(i, j)] = 0;
+    }
+  }
+  setBound(0, div);
+  setBound(0, p);
+  for (let k = 0; k <= GSiter; k++) {
+    for (let i = 1; i <= N; i++) {
+      for (let j = 1; j <= N; j++) {
+        p[IX(i, j)] = (div[IX(i, j)] + p[IX(i-1, j)] + p[IX(i+1, j)]
+                                     + p[IX(i, j-1)] + p[IX(i, j+1)]) / 4;
+      }
+    }
+    setBound(0, p);
+  }
+  for (let i = 1; i <= N; i++) {
+    for (let j = 1; j <= N; j++) {
+      u[IX(i, j)] -= 0.5 * (p[IX(i+1, j)] - p[IX(i-1, j)]) / h;
+      v[IX(i, j)] -= 0.5 * (p[IX(i, j+1)] - p[IX(i, j-1)]) / h;
+    }
+  }
+  setBound(1, u);
+  setBound(2, v);
+}
+
+function velocityStep(vel, visc, dt) {
+  [vel["u0"], vel["u"]] = [vel["u"], vel["u0"]];
+  diffuse(1, vel.u, vel.u0, visc, dt);
+  [vel["v0"], vel["v"]] = [vel["v"], vel["v0"]];
+  diffuse(2, vel.v, vel.v0, visc, dt);
+  project(vel.u, vel.v, vel.u0, vel.v0);
+  [vel["u0"], vel["u"]] = [vel["u"], vel["u0"]];
+  [vel["v0"], vel["v"]] = [vel["v"], vel["v0"]];
+  advect(1, vel.u, vel.u0, vel.u0, vel.v0, dt);
+  advect(2, vel.v, vel.v0, vel.u0, vel.v0, dt);
+  project(vel.u, vel.v, vel.u0, vel.v0);
+}
+
+const S = (N + 2) * (N + 2);
+const u  = new Float32Array(S);
+const v  = new Float32Array(S);
+const u0 = new Float32Array(S);
+const v0 = new Float32Array(S);
+const vel = { u, v, u0, v0 };
+
+const d  = new Float32Array(S);
+const d0 = new Float32Array(S);
+const dens = { d, d0 };
+
+// Pointer interaction
+// uses previous previous pointer to calculate velocity
+// velocity of points close to cursor change to reflect velocity of cursor
+let pmx = null, pmy = null;
+let ppmx = null, ppmy = null;
+canvas.addEventListener("pointermove", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width;
+  const y = (e.clientY - rect.top) / rect.height;
+  const gx = 1 + x * (N - 1);
+  const gy = 1 + y * (N - 1);
+
+  if (pmx === null) {
+    pmx = gx; pmy = gy;
+    ppmx = gx; ppmy = gy;
+    return;
+  }
+
+  const dx = (gx - ppmx) / 2;
+  const dy = (gy - ppmy) / 2;
+  pmx = gx; pmy = gy;
+  ppmx = pmx; ppmy = pmy;
+
+  const strength = 1;
+  const r = 2; // radius
+
+  let ii = clamp(Math.floor(gx), 1, N);
+  let jj = clamp(Math.floor(gy), 1, N);
+
+  let i0 = clamp(ii - r, 1, N), i1 = clamp(ii + r, 1, N);
+  let j0 = clamp(jj - r, 1, N), j1 = clamp(jj + r, 1, N);
+
+  for (let i = i0; i <= i1; i++) {
+    for (let j = j0; j <= j1; j++) {
+      const id = IX(i, j);
+      const dist = Math.sqrt((ii - i) * (ii - i) + (jj - j) * (jj - j));
+      vel.u[id] += dx * strength * Math.exp(-2 * dist / r);
+      vel.v[id] += dy * strength * Math.exp(-2 * dist / r);
+    }
+  }
+});
+
+const hidden = document.createElement("canvas");
+const hiddenCtx = hidden.getContext("2d", { alpha: false });
+let img = null;
+
+function resize() {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width  = Math.floor(innerWidth * dpr);
+  canvas.height = Math.floor(innerHeight * dpr);
+
+  hidden.width = N;
+  hidden.height = N;
+  img = hiddenCtx.createImageData(N, N);
+}
+addEventListener("resize", resize);
+resize();
+
+function draw() {
+  const px = img.data;
+
+  for (let j = 1; j <= N; j++) {
+    for (let i = 1; i <= N; i++) {
+      const k = ((j - 1) * N + (i - 1)) * 4;
+      const val = clamp(dens.d[IX(i, j)], 0, 255) | 0;
+      px[k] = px[k+1] = px[k+2] = val;
+//      px[k] = val;            // red smoke
+//      px[k+1] = px[k+2] = 0;
+      px[k+3] = 255;
+    }
+  }
+
+  hiddenCtx.putImageData(img, 0, 0);
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(hidden, 0, 0, canvas.width, canvas.height);
+}
+
+let next = 500 + Math.random() * 1500;
+let side = Math.floor(4 * Math.random() + 1);
+let dist = Math.floor(Math.random() * N) + 1;
+let parity = side % 2 == 0 ? 1 : N;
+function geyser(now) {
+  if (now < next) {return;}
+  if (now >= next + 200) {
+    side = Math.floor(4 * Math.random() + 1);
+    dist = Math.floor(Math.random() * N) + 1;
+    parity = side % 2 == 0 ? 1 : N;
+    next = now + 500 + Math.random() * 1500;
+    return;
+  }
+  const pow = 30;
+  const vol = 255;
+  if (side <= 2) {
+    dens.d[IX(parity, dist)] += vol;
+    dens.d[IX(parity, clamp(dist + 1, 1, N))] += vol;
+    dens.d[IX(parity, clamp(dist - 1, 1, N))] += vol;
+    vel.u[IX(parity, dist)] += pow * (1 - 2 * (parity - 1) / (N - 1));
+  } else {
+    dens.d[IX(dist, parity)] += vol;
+    dens.d[IX(clamp(dist + 1, 1, N), parity)] += vol;
+    dens.d[IX(clamp(dist - 1, 1, N), parity)] += vol;
+    vel.v[IX(dist, parity)] += pow * (1 - 2 * (parity - 1) / (N - 1));
+  }
+}
+
+let last = performance.now();
+function step(now) {
+  let dt =  (now - last) / 1000;
+  last = now;
+  dt = Math.min(dt, 1/30);
+
+  geyser(now);
+  velocityStep(vel, visc, dt);
+  densityStep(dens, vel, diff, dt);
+
+  draw();
+  requestAnimationFrame(step);
+}
+requestAnimationFrame(step);
+
+</script>
+</body>
+</html>
