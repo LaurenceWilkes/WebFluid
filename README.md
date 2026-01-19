@@ -1,5 +1,5 @@
 # WebFluid
-The simulation can be found [here](https://laurencewilkes.github.io/WebFluid/)
+The simulation can be found [here](https://laurencewilkes.github.io/WebFluid/).
 
 This is a 2D semi-Lagrangian fluid simulation based on the document [Real-Time Fluid Dynamics for Games](https://graphics.cs.cmu.edu/nsp/course/15-464/Fall09/papers/StamFluidforGames.pdf) by Jos Stam.
 
