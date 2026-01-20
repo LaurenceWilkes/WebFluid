@@ -1,5 +1,5 @@
 # WebFluid
-The simulation can be found [here](https://laurencewilkes.github.io/WebFluid/). 
+The simulation can be found [here](https://laurencewilkes.github.io/WebFluid/) without arrows and [here](https://laurencewilkes.github.io/WebFluid?arrows) with arrows. 
 Currently, the simulation only shows puffs of smoke at random intervals coming from random edges. 
 The borders are all still in place so eventually the screen will become completely white.
 The underlying fluid can be interacted with using the mouse.

@@ -16,10 +16,9 @@ const ctx = canvas.getContext("2d", { alpha: false });
 // Parameters
 const N = 96;
 const diff = 0.00001; // dye diffusion rate
-const visc = 0.0005; // viscosity
-const GSiter = 12;
-const inflow = 180.0;
-const densityFlow = 10.0;
+const visc = 0.0005;  // viscosity
+const iterGS = 12;
+const arrows = new URLSearchParams(window.location.search).has("arrows");
 
 const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 const IX = (i, j) => i + (N + 2) * j;
@@ -40,7 +39,7 @@ function setBound(b, x) {
 
 function diffuse(b, x, x0, diff, dt) {
   const a = dt * diff * N * N;
-  for (let k = 0; k < GSiter; k++) { // Gauss--Seidel
+  for (let k = 0; k < iterGS; k++) { // Gauss--Seidel
     for (let i = 1; i <= N; i++) {
       for (let j = 1; j <= N; j++) {
         const id = IX(i, j);
@@ -94,7 +93,7 @@ function project(u, v, p, div) {
   }
   setBound(0, div);
   setBound(0, p);
-  for (let k = 0; k <= GSiter; k++) {
+  for (let k = 0; k <= iterGS; k++) {
     for (let i = 1; i <= N; i++) {
       for (let j = 1; j <= N; j++) {
         p[IX(i, j)] = (div[IX(i, j)] + p[IX(i-1, j)] + p[IX(i+1, j)]
@@ -179,6 +178,29 @@ canvas.addEventListener("pointermove", (e) => {
   }
 });
 
+function drawArrow(ctx, x0, y0, x1, y1) {
+  const dx = x1 - x0, dy = y1 - y0;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-6) return;
+
+  const ux = dx / len, uy = dy / len;
+  const px = -uy, py = ux;
+
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x1, y1);
+  ctx.stroke();
+
+  const hx = x1 - ux * 6;
+  const hy = y1 - uy * 6;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(hx + px * 4, hy + py * 4);
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(hx - px * 4, hy - py * 4);
+  ctx.stroke();
+}
+
 const hidden = document.createElement("canvas");
 const hiddenCtx = hidden.getContext("2d", { alpha: false });
 let img = null;
@@ -202,10 +224,8 @@ function draw() {
     for (let i = 1; i <= N; i++) {
       const k = ((j - 1) * N + (i - 1)) * 4;
       const val = clamp(dens.d[IX(i, j)], 0, 255) | 0;
-      px[k] = px[k+1] = px[k+2] = val;
-//      px[k] = val;            // red smoke
-//      px[k+1] = px[k+2] = 0;
-      px[k+3] = 255;
+      px[k] = px[k + 1] = px[k + 2] = val;
+      px[k + 3] = 255;
     }
   }
 
@@ -213,33 +233,55 @@ function draw() {
 
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(hidden, 0, 0, canvas.width, canvas.height);
+
+  if (!arrows) return;
+  const stride = 2;     // arrow density lower more
+  const arrowLen = 100; // how long arrows look
+
+  ctx.save();
+  ctx.strokeStyle = "red";
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.9;
+  const cellW = canvas.width / N;
+  const cellH = canvas.height / N;
+
+  for (let j = 1; j <= N; j += stride) {
+    for (let i = 1; i <= N; i += stride) {
+      const id = IX(i, j);
+      const cx = (i - 0.5) * cellW, cy = (j - 0.5) * cellH;
+      const uu = vel.u[id] * arrowLen, vv = vel.v[id] * arrowLen;
+      drawArrow(ctx, cx, cy, cx + uu, cy + vv);
+    }
+  }
+
+  ctx.restore();
 }
 
 let next = 500 + Math.random() * 1500;
 let side = Math.floor(4 * Math.random() + 1);
 let dist = Math.floor(Math.random() * N) + 1;
-let parity = side % 2 == 0 ? 1 : N;
+let parity = side % 2 == 0 ? 2 : N-1;
 function geyser(now) {
   if (now < next) {return;}
-  if (now >= next + 200) {
+  if (now >= next + 1000) {
     side = Math.floor(4 * Math.random() + 1);
     dist = Math.floor(Math.random() * N) + 1;
-    parity = side % 2 == 0 ? 1 : N;
+    parity = side % 2 == 0 ? 2 : N-1;
     next = now + 500 + Math.random() * 1500;
     return;
   }
-  const pow = 30;
-  const vol = 255;
+  const pow = 1;
+  const vol = 155;
   if (side <= 2) {
     dens.d[IX(parity, dist)] += vol;
     dens.d[IX(parity, clamp(dist + 1, 1, N))] += vol;
     dens.d[IX(parity, clamp(dist - 1, 1, N))] += vol;
-    vel.u[IX(parity, dist)] += pow * (1 - 2 * (parity - 1) / (N - 1));
+    vel.u[IX(parity, dist)] += pow * (1 - 2 * (parity - 2) / (N - 3));
   } else {
     dens.d[IX(dist, parity)] += vol;
     dens.d[IX(clamp(dist + 1, 1, N), parity)] += vol;
     dens.d[IX(clamp(dist - 1, 1, N), parity)] += vol;
-    vel.v[IX(dist, parity)] += pow * (1 - 2 * (parity - 1) / (N - 1));
+    vel.v[IX(dist, parity)] += pow * (1 - 2 * (parity - 2) / (N - 3));
   }
 }
 
