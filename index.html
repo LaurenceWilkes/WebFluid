@@ -14,9 +14,9 @@ const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d", { alpha: false });
 
 // Parameters
-const N = 96;
+const N = 128;
 const diff = 0.00001; // dye diffusion rate
-const visc = 0.0005;  // viscosity
+const visc = 0.00005;  // viscosity
 const iterGS = 12;
 const arrows = new URLSearchParams(window.location.search).has("arrows");
 
