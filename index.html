@@ -14,7 +14,7 @@ const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d", { alpha: false });
 
 // Parameters
-const N = 128;
+const N = 64;
 const diff = 0.00001; // dye diffusion rate
 const visc = 0.00005;  // viscosity
 const iterGS = 12;
@@ -74,10 +74,18 @@ function advect(b, d, d0, u, v, dt) {
 }
 
 function densityStep(dens, vel, diff, dt) {
-  [dens["d"], dens["d0"]] = [dens["d0"], dens["d"]];
-  diffuse(0, dens.d, dens.d0, diff, dt);
-  [dens["d"], dens["d0"]] = [dens["d0"], dens["d"]];
-  advect(0, dens.d, dens.d0, vel.u, vel.v, dt);
+  [dens["dr"], dens["dr0"]] = [dens["dr0"], dens["dr"]];
+  diffuse(0, dens.dr, dens.dr0, diff, dt);
+  [dens["dr"], dens["dr0"]] = [dens["dr0"], dens["dr"]];
+  advect(0, dens.dr, dens.dr0, vel.u, vel.v, dt);
+  [dens["dg"], dens["dg0"]] = [dens["dg0"], dens["dg"]];
+  diffuse(0, dens.dg, dens.dg0, diff, dt);
+  [dens["dg"], dens["dg0"]] = [dens["dg0"], dens["dg"]];
+  advect(0, dens.dg, dens.dg0, vel.u, vel.v, dt);
+  [dens["db"], dens["db0"]] = [dens["db0"], dens["db"]];
+  diffuse(0, dens.db, dens.db0, diff, dt);
+  [dens["db"], dens["db0"]] = [dens["db0"], dens["db"]];
+  advect(0, dens.db, dens.db0, vel.u, vel.v, dt);
 }
 
 function project(u, v, p, div) {
@@ -132,9 +140,13 @@ const u0 = new Float32Array(S);
 const v0 = new Float32Array(S);
 const vel = { u, v, u0, v0 };
 
-const d  = new Float32Array(S);
-const d0 = new Float32Array(S);
-const dens = { d, d0 };
+const dr  = new Float32Array(S);
+const dr0 = new Float32Array(S);
+const dg  = new Float32Array(S);
+const dg0 = new Float32Array(S);
+const db  = new Float32Array(S);
+const db0 = new Float32Array(S);
+const dens = { dr, dr0, dg, dg0, db, db0 };
 
 // Pointer interaction
 // uses previous previous pointer to calculate velocity
@@ -223,8 +235,12 @@ function draw() {
   for (let j = 1; j <= N; j++) {
     for (let i = 1; i <= N; i++) {
       const k = ((j - 1) * N + (i - 1)) * 4;
-      const val = clamp(dens.d[IX(i, j)], 0, 255) | 0;
-      px[k] = px[k + 1] = px[k + 2] = val;
+      const valr = clamp(dens.dr[IX(i, j)], 0, 255) | 0;
+      const valg = clamp(dens.dg[IX(i, j)], 0, 255) | 0;
+      const valb = clamp(dens.db[IX(i, j)], 0, 255) | 0;
+      px[k] = valr;
+      px[k + 1] = valg;
+      px[k + 2] = valb;
       px[k + 3] = 255;
     }
   }
@@ -257,31 +273,44 @@ function draw() {
   ctx.restore();
 }
 
+
 let next = 500 + Math.random() * 1500;
-let side = Math.floor(4 * Math.random() + 1);
-let dist = Math.floor(Math.random() * N) + 1;
-let parity = side % 2 == 0 ? 2 : N-1;
+let par1 = true, par2 = true, dist = 1, col = [1, 1, 1]; // geyser setup
+
+function resetGeyser() {
+  par1 = Math.random() < 0.5;                 // false: horizontal, true: vertical
+  par2 = Math.random() < 0.5;                 // false: far side, true: near side
+  dist = Math.floor(Math.random() * N) + 1;
+  const h = Math.random() * 6, i = h | 0, f = h - i, s = 0.85, v = 1.0; // Random HSV colour to rgb
+  const p = v * (1 - s), q = v * (1 - s * f), t = v * (1 - s * (1 - f));
+  col = [[v,t,p],[q,v,p],[p,v,t],[p,q,v],[t,p,v],[v,p,q]][i];
+}
+
+resetGeyser();
+
 function geyser(now) {
-  if (now < next) {return;}
+  if (now < next) return;
   if (now >= next + 1000) {
-    side = Math.floor(4 * Math.random() + 1);
-    dist = Math.floor(Math.random() * N) + 1;
-    parity = side % 2 == 0 ? 2 : N-1;
     next = now + 500 + Math.random() * 1500;
+    resetGeyser();
     return;
   }
-  const pow = 1;
-  const vol = 155;
-  if (side <= 2) {
-    dens.d[IX(parity, dist)] += vol;
-    dens.d[IX(parity, clamp(dist + 1, 1, N))] += vol;
-    dens.d[IX(parity, clamp(dist - 1, 1, N))] += vol;
-    vel.u[IX(parity, dist)] += pow * (1 - 2 * (parity - 2) / (N - 3));
-  } else {
-    dens.d[IX(dist, parity)] += vol;
-    dens.d[IX(clamp(dist + 1, 1, N), parity)] += vol;
-    dens.d[IX(clamp(dist - 1, 1, N), parity)] += vol;
-    vel.v[IX(dist, parity)] += pow * (1 - 2 * (parity - 2) / (N - 3));
+
+  const pow = 1, vol = 155;
+  const nf = par2 ? 2 : (N - 1);
+  const sgn = par2 ? 1 : -1;
+  const jet = pow * sgn;
+
+  for (let k = -1; k <= 1; k++) {
+    const dd = clamp(dist + k, 1, N);
+    const id = par1 ? IX(dd, nf) : IX(nf, dd);
+
+    dens.dr[id] += vol * col[0];
+    dens.dg[id] += vol * col[1];
+    dens.db[id] += vol * col[2];
+
+    if (par1) vel.v[id] += jet;
+    else      vel.u[id] += jet;
   }
 }
 
