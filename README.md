@@ -7,7 +7,7 @@ The underlying fluid can be interacted with using the mouse.
 This is a 2D semi-Lagrangian fluid simulation based on the document [Real-Time Fluid Dynamics for Games](https://graphics.cs.cmu.edu/nsp/course/15-464/Fall09/papers/StamFluidforGames.pdf) by Jos Stam.
 
 ## Overview
-The simulation works on a grid of pixels, each representing a $`1/N \times 1/N`$ square in the square domain.
+The simulation works on a grid of pixels, each representing a $`(1/N) \times (1/N)`$ square in the square domain.
 Each pixel stores a scalar density, representing the concentration of a dye in that square, and a velocity vector, which represents the movement of the fluid.
 
 At each step of the simulation, the source is added (both to the dye matrix and to the velocity matrix), the velocity _diffuses_, _projects_, _advects_, and then _projects_ again, and the density _diffuses_ and then _advects_.
