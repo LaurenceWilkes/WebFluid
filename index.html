@@ -15,9 +15,9 @@ const ctx = canvas.getContext("2d", { alpha: false });
 
 // Parameters
 const N = 96;
-const diff = 0.00001; // dye diffusion rate
+const diff = 0.000001; // dye diffusion rate
 const visc = 0.00005;  // viscosity
-const iterGS = 12;
+const iterGS = 10;
 const arrows = new URLSearchParams(window.location.search).has("arrows");
 
 const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
@@ -281,16 +281,16 @@ function resetGeyser() {
   par1 = Math.random() < 0.5;                 // false: horizontal, true: vertical
   par2 = Math.random() < 0.5;                 // false: far side, true: near side
   dist = Math.floor(Math.random() * N) + 1;
-  const h = Math.random() * 6, i = h | 0, f = h - i, s = 0.85, v = 1.0; // Random HSV colour to rgb
-  const p = v * (1 - s), q = v * (1 - s * f), t = v * (1 - s * (1 - f));
-  col = [[v,t,p],[q,v,p],[p,v,t],[p,q,v],[t,p,v],[v,p,q]][i];
+  const h = Math.random() * 6, i = h | 0, f = h - i, s = 0.85, vv = 1.0; // Random HSV colour to rgb
+  const p = vv * (1 - s), q = vv * (1 - s * f), t = vv * (1 - s * (1 - f));
+  col = [[vv, t, p], [q, vv, p], [p, vv, t], [p, q, vv], [t, p, vv], [vv, p, q]][i];
 }
 
 resetGeyser();
 
 function geyser(now) {
   if (now < next) return;
-  if (now >= next + 1000) {
+  if (now >= next + 3000) {
     next = now + 500 + Math.random() * 1500;
     resetGeyser();
     return;
